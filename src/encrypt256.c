@@ -6,16 +6,27 @@
 #include <immintrin.h>
 #include <x86intrin.h>
 
-#include <time.h>
-
 void print128_num(__m128i var)
 {
-	int64_t e0, e1;
+	int64_t e0, e1, e2, e3;
 	e0 = _mm_extract_epi64 (var, 0);
 	e1 = _mm_extract_epi64 (var, 1);
+	//e1 = _mm_extract_epi64 (var, 1);
+	//e1 = _mm_extract_epi64 (var, 1);
+
     printf("%016"PRIx64"%016"PRIx64"\n", e1, e0);
 }
 
+void print256_num(__m256i var)
+{
+	int64_t e0, e1, e2, e3;
+	e0 = _mm256_extract_epi64 (var, 0);
+	e1 = _mm256_extract_epi64 (var, 1);
+	e2 = _mm256_extract_epi64 (var, 2);
+	e3 = _mm256_extract_epi64 (var, 3);
+
+    printf("%016"PRIx64" %016"PRIx64" %016"PRIx64" %016"PRIx64"\n", e3, e2, e1, e0);
+}
 
 __m128i get_m128i_variable_from_uint8_array(uint8_t *inputArray)
 {
@@ -37,11 +48,38 @@ __m128i get_m128i_variable_from_uint8_array(uint8_t *inputArray)
 	return res;
 }
 
-__m128i ShiftRowsLayer (__m128i input)
+__m256i get_m256i_variable_from_uint8_array(uint8_t *inputArray)
 {
-	uint8_t shiftRowsScalar[] = {0x0f, 0x0a, 0x05, 0x00, 0x0b, 0x06, 0x01, 0x0c, 0x07, 0x02, 0x0d, 0x08, 0x03, 0x0e, 0x09, 0x04};
-	__m128i shiftRows = get_m128i_variable_from_uint8_array(shiftRowsScalar);
-	return _mm_shuffle_epi8(input, shiftRows);
+	__m256i res;
+	int i;
+	int64_t b3, b2, b1, b0;
+	
+	b3 = 0;
+	b2 = 0;
+	b1 = 0;
+	b0 = 0;
+	
+	for(i=0;i<32;i++)
+	{
+		if(i<8)
+			b3 = b3 << 8 | inputArray[i];//most signif. bits
+		else if(i<16)
+			b2 = b2 << 8 | inputArray[i];
+		else if(i<24)
+			b1 = b1 << 8 | inputArray[i];
+		else if(i<32)
+			b0 = b0 << 8 | inputArray[i];//least signif. bits
+	}
+	res = _mm256_set_epi64x (b3, b2, b1, b0);
+	
+	return res;
+}
+
+__m256i ShiftRowsLayer (__m256i input)
+{
+	uint8_t shiftRowsScalar[] = {0x0f, 0x0a, 0x05, 0x00, 0x0b, 0x06, 0x01, 0x0c, 0x07, 0x02, 0x0d, 0x08, 0x03, 0x0e, 0x09, 0x04, 0x0f, 0x0a, 0x05, 0x00, 0x0b, 0x06, 0x01, 0x0c, 0x07, 0x02, 0x0d, 0x08, 0x03, 0x0e, 0x09, 0x04};
+	__m256i shiftRows = get_m256i_variable_from_uint8_array(shiftRowsScalar);
+	return _mm256_shuffle_epi8(input, shiftRows);
 }
 
 void inverseGF2P4 (__m128i input, __m128i *lOut, __m128i *rOut)
@@ -116,6 +154,8 @@ void inverseGF2P4 (__m128i input, __m128i *lOut, __m128i *rOut)
 
 void substituteLayer (__m128i input, __m128i *sBoxOut, __m128i *sBoxOutDouble)
 {
+	__m128i res;
+	
 	uint8_t lowersplitterscalar[] = {0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f};
 	__m128i lowersplitter = get_m128i_variable_from_uint8_array(lowersplitterscalar);
 		
@@ -187,79 +227,7 @@ __m128i mixColumnLayer (__m128i x, __m128i xDouble)
 	return x;
 }
 
-int getRCi (int i)
-{
-	int rci;
-	switch(i)
-	{
-		case 1:
-			rci = 0x01;
-			break;
-		case 2:
-			rci = 0x02;
-			break;
-		case 3:
-			rci = 0x04;
-			break;
-		case 4:
-			rci = 0x08;
-			break;
-		case 5:
-			rci = 0x10;
-			break;
-		case 6:
-			rci = 0x20;
-			break;
-		case 7:
-			rci = 0x40;
-			break;
-		case 8:
-			rci = 0x80;
-			break;
-		case 9:
-			rci = 0x1b;
-			break;
-		case 10:
-			rci = 0x36;
-			break;
-	}
-	return rci;
-}
-
-__m128i getKeySchedule(__m128i prevKey, int i)
-{
-	__m128i ki;
-	
-	int k0,k1,k2,k3;
-	k0 = _mm_extract_epi32 (prevKey, 0);
-	k1 = _mm_extract_epi32 (prevKey, 1);
-	k2 = _mm_extract_epi32 (prevKey, 2);
-	k3 = _mm_extract_epi32 (prevKey, 3);
-	
-	int nk0 = _rotl (k0, 8);
-	int rci = getRCi(i) << 24;
-	
-	__m128i lastVal = _mm_set_epi32 (nk0, nk0, nk0, nk0);
-	__m128i rc      = _mm_set_epi32 (rci, rci, rci, rci);
-	
-	int pc0,pc1,pc2,pc3;
-	pc3 = k3;
-	pc2 = pc3 ^ k2;
-	pc1 = pc2 ^ k1;
-	pc0 = pc1 ^ k0;
-	
-	__m128i preComp = _mm_set_epi32 (pc3, pc2, pc1, pc0);
-	
-	substituteLayer (lastVal, &lastVal, NULL);
-	
-	lastVal = _mm_xor_si128 (rc, lastVal);
-	
-	ki = _mm_xor_si128 (lastVal, preComp);
-	
-	return ki;
-}
-
-__m128i encrypt_128 (__m128i input, __m128i keys[])
+__m128i encrypt_256 (__m128i input, __m128i keys[])
 {
 	int i=1;
 	
@@ -270,12 +238,12 @@ __m128i encrypt_128 (__m128i input, __m128i keys[])
 	for(i=1;i<=10;i++)
 	{
 		//shiftrows
-		input = ShiftRowsLayer(input);
+		//input = ShiftRowsLayer(input);
 
 		//sbox
 		__m128i xDouble;
 		substituteLayer (input, &input, &xDouble);
-
+		
 		//mixcolumn
 		if(i!=10)
 			input = mixColumnLayer (input, xDouble);
@@ -289,41 +257,15 @@ __m128i encrypt_128 (__m128i input, __m128i keys[])
 
 int main()
 {
-	uint8_t inputscalar[] = {0xab, 0x1e, 0x56, 0x75, 0x93, 0x15, 0x26, 0x88, 0x97, 0xa6, 0xbd, 0x7a, 0x9b, 0x0c, 0x1f, 0xae};
-	__m128i input = get_m128i_variable_from_uint8_array(inputscalar);
+	uint8_t inputscalar[] = {0xAE, 0x2D, 0x8A, 0x57, 0x1E, 0x03, 0xAC, 0x9C, 0x9E, 0xB7, 0x6F, 0xAC, 0x45, 0xAF, 0x8E, 0x51, 0xab, 0x1e, 0x56, 0x75, 0x93, 0x15, 0x26, 0x88, 0x97, 0xa6, 0xbd, 0x7a, 0x9b, 0x0c, 0x1f, 0xae};
+	__m256i input = get_m256i_variable_from_uint8_array(inputscalar);
+	print256_num(input);
+	input = ShiftRowsLayer (input);
 	
-	uint8_t keyscalar[] = {'t','h','i','s','i','s','s','i','x','t','e','e','n','a','b','c'};
+	uint8_t keyscalar[] = {0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6, 0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C};
 	__m128i key = get_m128i_variable_from_uint8_array(keyscalar);
 	
-	__m128i keySchedules[11];
-	keySchedules[0] = key;
+	//__m128i cipherText = encrypt_128 (input, key);
 	
-	int s;
-	for(s=1;s<=10;s++)
-	{
-		key = getKeySchedule (key, s);
-		keySchedules[s] = key;
-	}
-	
-	int i;
-	float avgtime = 0;
-	int totalTimes = 100000;
-	//for(i=0;i<totalTimes;i++)
-	{
-		clock_t start, end;
-		
-		start = clock();
-		//__m128i cipherText = encrypt_128 (input, keySchedules);
-		print128_num(input);
-		input=ShiftRowsLayer(input);
-		print128_num(input);
-		end = clock();
-		
-		float timeTaken = (((double)(end-start))/CLOCKS_PER_SEC)*1000000;
-		
-		printf("%d %f\n",i, timeTaken);
-		avgtime += timeTaken;
-		//print128_num(cipherText);
-	}
-	//printf("avg time for %d runs: %f microsoeconds\n",totalTimes, avgtime/totalTimes);
+	print256_num(input);
 }

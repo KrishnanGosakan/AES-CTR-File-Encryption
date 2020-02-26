@@ -6,6 +6,7 @@
 #include <sys/io.h>
 #include <sys/mman.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <emmintrin.h>
 #include <tmmintrin.h>
 #include <immintrin.h>
@@ -13,10 +14,10 @@
 
 void print128_num(__m128i var)
 {
-    uint8_t *val = (uint8_t*) &var;
-    printf("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", 
-           val[0], val[1], val[2], val[3], val[4], val[5], 
-           val[6], val[7], val[8], val[9], val[10], val[11], val[12], val[13], val[14], val[15]);
+	int64_t e0, e1;
+	e0 = _mm_extract_epi64 (var, 0);
+	e1 = _mm_extract_epi64 (var, 1);
+    printf("%016"PRIx64"%016"PRIx64"\n", e0, e1);
 }
 
 struct inputBlock
