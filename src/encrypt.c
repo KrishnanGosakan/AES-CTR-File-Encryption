@@ -13,9 +13,8 @@ void print128_num(__m128i var)
 	int64_t e0, e1;
 	e0 = _mm_extract_epi64 (var, 0);
 	e1 = _mm_extract_epi64 (var, 1);
-    printf("%016"PRIx64"%016"PRIx64"\n", e1, e0);
+    printf("%016"PRIx64"%016"PRIx64"", e1, e0);
 }
-
 
 __m128i get_m128i_variable_from_uint8_array(uint8_t *inputArray)
 {
@@ -32,6 +31,7 @@ __m128i get_m128i_variable_from_uint8_array(uint8_t *inputArray)
 		else
 			r64 = r64 << 8 | inputArray[i];//least signif. bits
 	}
+	
 	res = _mm_set_epi64x (l64, r64);
 	
 	return res;
@@ -265,8 +265,7 @@ __m128i encrypt_128 (__m128i input, __m128i keys[])
 	
 	//initial addroundkey
 	input = _mm_xor_si128 (input, keys[0]);
-	//print128_num(input);
-	//printf("\n");
+	
 	for(i=1;i<=10;i++)
 	{
 		//shiftrows
@@ -287,7 +286,7 @@ __m128i encrypt_128 (__m128i input, __m128i keys[])
 	return input;
 }
 
-int main()
+/*int main()
 {
 	uint8_t inputscalar[] = {0xab, 0x1e, 0x56, 0x75, 0x93, 0x15, 0x26, 0x88, 0x97, 0xa6, 0xbd, 0x7a, 0x9b, 0x0c, 0x1f, 0xae};
 	__m128i input = get_m128i_variable_from_uint8_array(inputscalar);
@@ -307,16 +306,13 @@ int main()
 	
 	int i;
 	float avgtime = 0;
-	int totalTimes = 100000;
-	//for(i=0;i<totalTimes;i++)
+	int totalTimes = 20;
+	for(i=0;i<totalTimes;i++)
 	{
 		clock_t start, end;
 		
 		start = clock();
-		//__m128i cipherText = encrypt_128 (input, keySchedules);
-		print128_num(input);
-		input=ShiftRowsLayer(input);
-		print128_num(input);
+		__m128i cipherText = encrypt_128 (input, keySchedules);
 		end = clock();
 		
 		float timeTaken = (((double)(end-start))/CLOCKS_PER_SEC)*1000000;
@@ -326,4 +322,4 @@ int main()
 		//print128_num(cipherText);
 	}
 	//printf("avg time for %d runs: %f microsoeconds\n",totalTimes, avgtime/totalTimes);
-}
+}*/
